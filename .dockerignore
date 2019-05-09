@@ -1,0 +1,9 @@
+.elasticbeanstalk/*
+.git
+.gitignore
+.ebextensions
+.gradle
+.idea
+gradle
+static
+build

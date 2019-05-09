@@ -16,7 +16,13 @@ import javax.mail.internet.MimeMessage;
 
 import java.util.Properties;
 
+import com.amazonaws.auth.InstanceProfileCredentialsProvider;
+import com.amazonaws.regions.Regions;
+import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.google.common.io.BaseEncoding;
+
+import com.amazonaws.services.sns.AmazonSNSClient;
+import com.amazonaws.services.sns.AmazonSNS;
 
 class AlertDispatcher implements Runnable {
     private static final long WAIT_MS = 15 * 60 * 1000;
@@ -25,19 +31,12 @@ class AlertDispatcher implements Runnable {
     @Override
     public void run() {
         final SQLiteConnection conn = new SQLiteConnection(AttestationProtocol.ATTESTATION_DATABASE);
-        final SQLiteStatement selectConfiguration;
         final SQLiteStatement selectAccounts;
         final SQLiteStatement selectExpired;
         final SQLiteStatement selectFailed;
         final SQLiteStatement selectEmails;
         try {
             AttestationServer.open(conn, false);
-            selectConfiguration = conn.prepare("SELECT " +
-                    "(SELECT value FROM Configuration WHERE key = 'emailLocal'), " +
-                    "(SELECT value FROM Configuration WHERE key = 'emailUsername'), " +
-                    "(SELECT value FROM Configuration WHERE key = 'emailPassword'), " +
-                    "(SELECT value FROM Configuration WHERE key = 'emailHost'), " +
-                    "(SELECT value FROM Configuration WHERE key = 'emailPort')");
             selectAccounts = conn.prepare("SELECT userId, alertDelay FROM Accounts");
             selectExpired = conn.prepare("SELECT fingerprint FROM Devices " +
                     "WHERE userId = ? AND verifiedTimeLast < ? AND deletionTime IS NULL");
@@ -58,48 +57,20 @@ class AlertDispatcher implements Runnable {
 
             System.err.println("dispatching alerts");
 
+            final String arn = System.getenv("SNS_ARN");
+            final String region = System.getenv("REGION");
+
+            AmazonSNS snsClient = null;
             try {
-                selectConfiguration.step();
-                final int local = selectConfiguration.columnInt(0);
-                final String username = selectConfiguration.columnString(1);
-                final String password = selectConfiguration.columnString(2);
-                final String host = selectConfiguration.columnString(3);
-                final String port = selectConfiguration.columnString(4);
+                InstanceProfileCredentialsProvider provider = new InstanceProfileCredentialsProvider(true);
+                snsClient = AmazonSNSClientBuilder.standard().withCredentials(provider).withRegion(region).build();
+            } catch (Exception e) {
+                System.err.println("failed to send to SNS");
+                e.printStackTrace();
+                continue;
+            }
 
-                final Session session;
-                if (local == 1) {
-                    if (username == null) {
-                        System.err.println("missing email configuration");
-                        continue;
-                    }
-                    final Properties props = new Properties();
-                    props.put("mail.smtp.connectiontimeout", Integer.toString(TIMEOUT_MS));
-                    props.put("mail.smtp.timeout", Integer.toString(TIMEOUT_MS));
-                    props.put("mail.smtp.writetimeout", Integer.toString(TIMEOUT_MS));
-                    session = Session.getInstance(props);
-                } else {
-                    if (username == null || password == null || host == null || port == null) {
-                        System.err.println("missing email configuration");
-                        continue;
-                    }
-
-                    final Properties props = new Properties();
-                    props.put("mail.transport.protocol.rfc822", "smtps");
-                    props.put("mail.smtps.auth", true);
-                    props.put("mail.smtps.host", host);
-                    props.put("mail.smtps.port", port);
-                    props.put("mail.smtps.connectiontimeout", Integer.toString(TIMEOUT_MS));
-                    props.put("mail.smtps.timeout", Integer.toString(TIMEOUT_MS));
-                    props.put("mail.smtps.writetimeout", Integer.toString(TIMEOUT_MS));
-
-                    session = Session.getInstance(props,
-                            new javax.mail.Authenticator() {
-                                protected PasswordAuthentication getPasswordAuthentication() {
-                                    return new PasswordAuthentication(username, password);
-                                }
-                            });
-                }
-
+            try {
                 while (selectAccounts.step()) {
                     final long userId = selectAccounts.columnLong(0);
                     final int alertDelay = selectAccounts.columnInt(1);
@@ -119,21 +90,11 @@ class AlertDispatcher implements Runnable {
                         while (selectEmails.step()) {
                             final String address = selectEmails.columnString(0);
                             System.err.println("sending email to " + address);
-                            try {
-                                final Message message = new MimeMessage(session);
-                                message.setFrom(new InternetAddress(username));
-                                message.setRecipients(Message.RecipientType.TO,
-                                        InternetAddress.parse(address));
-                                message.setSubject(
-                                        "Devices failed to provide valid attestations within " +
-                                        alertDelay / 60 / 60 + " hours");
-                                message.setText("The following devices have failed to provide valid attestations before the expiry time:\n\n" +
-                                        expired.toString());
-
-                                Transport.send(message);
-                            } catch (final MessagingException e) {
-                                e.printStackTrace();
-                            }
+                            snsClient.publish(arn,
+                                    "The following devices have failed to provide valid attestations before the expiry time:\n\n" +
+                                            expired.toString(),
+                                    "Devices failed to provide valid attestations within " +
+                                            alertDelay / 60 / 60 + " hours");
                         }
                         selectEmails.reset();
                     }
@@ -152,19 +113,10 @@ class AlertDispatcher implements Runnable {
                         while (selectEmails.step()) {
                             final String address = selectEmails.columnString(0);
                             System.err.println("sending email to " + address);
-                            try {
-                                final Message message = new MimeMessage(session);
-                                message.setFrom(new InternetAddress(username));
-                                message.setRecipients(Message.RecipientType.TO,
-                                        InternetAddress.parse(address));
-                                message.setSubject("Devices provided invalid attestations");
-                                message.setText("The following devices have provided invalid attestations:\n\n" +
-                                        failed.toString());
-
-                                Transport.send(message);
-                            } catch (final MessagingException e) {
-                                e.printStackTrace();
-                            }
+                            snsClient.publish(arn,
+                                    "Devices provided invalid attestations",
+                                    "The following devices have provided invalid attestations:\n\n" +
+                                            failed.toString());
                         }
                         selectEmails.reset();
                     }
@@ -173,7 +125,6 @@ class AlertDispatcher implements Runnable {
                 e.printStackTrace();
             } finally {
                 try {
-                    selectConfiguration.reset();
                     selectAccounts.reset();
                     selectExpired.reset();
                     selectFailed.reset();

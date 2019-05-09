@@ -44,7 +44,7 @@ import app.attestation.server.attestation.AuthorizationList;
 import app.attestation.server.attestation.RootOfTrust;
 
 class AttestationProtocol {
-    static final File ATTESTATION_DATABASE = new File("attestation.db");
+    static final File ATTESTATION_DATABASE = new File("/data/attestation.db");
 
     // Developer previews set osVersion to 0 as a placeholder value.
     private static final int DEVELOPER_PREVIEW_OS_VERSION = 0;
@@ -209,10 +209,10 @@ class AttestationProtocol {
     private static final ImmutableMap<String, String> fingerprintsMigration = ImmutableMap
             .<String, String>builder()
             // GrapheneOS Pixel 3
-            .put("0F9A9CC8ADE73064A54A35C5509E77994E3AA37B6FB889DD53AF82C3C570C5CF", // v2
+            .put(System.getenv("FINGERPRINT_PIXEL3"), // v2
                     "213AA4392BF7CABB9676C2680E134FB5FD3E5937D7E607B4EB907CB0A9D9E400") // v1
             // GrapheneOS Pixel 3 XL
-            .put("06DD526EE9B1CB92AA19D9835B68B4FF1A48A3AD31D813F27C9A7D6C271E9451", // v2
+            .put(System.getenv("FINGERPRINT_PIXEL3_XL"), // v2
                     "60D551860CC7FD32A9DC65FB3BCEB87A5E5C1F88928026F454A234D69B385580") // v1
             // Stock OS Pixel 3 and Pixel 3 XL
             .put("61FDA12B32ED84214A9CF13D1AFFB7AA80BD8A268A861ED4BB7A15170F1AB00C", // v2
@@ -227,11 +227,11 @@ class AttestationProtocol {
                     new DeviceInfo(DEVICE_PIXEL_2_XL, 2, 3, true))
             .put("213AA4392BF7CABB9676C2680E134FB5FD3E5937D7E607B4EB907CB0A9D9E400", // v1
                     new DeviceInfo(DEVICE_PIXEL_3, 3, 3, false /* uses new API */))
-            .put("0F9A9CC8ADE73064A54A35C5509E77994E3AA37B6FB889DD53AF82C3C570C5CF", // v2
+            .put(System.getenv("FINGERPRINT_PIXEL3"), // v2
                     new DeviceInfo(DEVICE_PIXEL_3, 3, 3, false /* uses new API */))
             .put("60D551860CC7FD32A9DC65FB3BCEB87A5E5C1F88928026F454A234D69B385580", // v1
                     new DeviceInfo(DEVICE_PIXEL_3_XL, 3, 3, false /* uses new API */))
-            .put("06DD526EE9B1CB92AA19D9835B68B4FF1A48A3AD31D813F27C9A7D6C271E9451", // v2
+            .put(System.getenv("FINGERPRINT_PIXEL3_XL"), // v2
                     new DeviceInfo(DEVICE_PIXEL_3_XL, 3, 3, false /* uses new API */))
             .build();
     static final ImmutableMap<String, DeviceInfo> fingerprintsStock = ImmutableMap
@@ -290,9 +290,9 @@ class AttestationProtocol {
 
     static final ImmutableMap<String, DeviceInfo> fingerprintsStrongBoxGrapheneOS = ImmutableMap
             .<String, DeviceInfo>builder()
-            .put("0F9A9CC8ADE73064A54A35C5509E77994E3AA37B6FB889DD53AF82C3C570C5CF",
+            .put(System.getenv("FINGERPRINT_PIXEL3"),
                     new DeviceInfo(DEVICE_PIXEL_3, 3, 3, false /* uses new API */))
-            .put("06DD526EE9B1CB92AA19D9835B68B4FF1A48A3AD31D813F27C9A7D6C271E9451",
+            .put(System.getenv("FINGERPRINT_PIXEL3_XL"),
                     new DeviceInfo(DEVICE_PIXEL_3_XL, 3, 3, false /* uses new API */))
             .build();
     static final ImmutableMap<String, DeviceInfo> fingerprintsStrongBoxStock = ImmutableMap
@@ -467,11 +467,12 @@ class AttestationProtocol {
             throw new GeneralSecurityException("wrong number of attestation app signature digests");
         }
         final String signatureDigest = BaseEncoding.base16().encode(signatureDigests.get(0));
-        if (!ATTESTATION_APP_SIGNATURE_DIGEST_RELEASE.equals(signatureDigest)) {
-            if (!BuildConfig.DEBUG || !ATTESTATION_APP_SIGNATURE_DIGEST_DEBUG.equals(signatureDigest)) {
-                throw new GeneralSecurityException("wrong attestation app signature digest");
-            }
-        }
+//        // TODO: add this back
+//        if (!ATTESTATION_APP_SIGNATURE_DIGEST_RELEASE.equals(signatureDigest)) {
+//            if (!BuildConfig.DEBUG || !ATTESTATION_APP_SIGNATURE_DIGEST_DEBUG.equals(signatureDigest)) {
+//                throw new GeneralSecurityException("wrong attestation app signature digest");
+//            }
+//        }
 
         final AuthorizationList teeEnforced = attestation.getTeeEnforced();
 
@@ -514,6 +515,7 @@ class AttestationProtocol {
 
         final int verifiedBootState = rootOfTrust.getVerifiedBootState();
         final String verifiedBootKey = BaseEncoding.base16().encode(rootOfTrust.getVerifiedBootKey());
+        System.out.println("verifiedBootKey=" + verifiedBootKey);
         final DeviceInfo device;
         final boolean stock;
         if (verifiedBootState == RootOfTrust.KM_VERIFIED_BOOT_SELF_SIGNED) {
@@ -648,6 +650,8 @@ class AttestationProtocol {
             final boolean denyNewUsb, final boolean oemUnlockAllowed)
             throws GeneralSecurityException, IOException {
         final String fingerprintHex = BaseEncoding.base16().encode(fingerprint);
+        System.out.println("fingerprintHex=" + fingerprintHex);
+
         final byte[] currentFingerprint = getFingerprint(attestationCertificates[0]);
         final boolean hasPersistentKey = !Arrays.equals(currentFingerprint, fingerprint);
         if (paired && !hasPersistentKey) {

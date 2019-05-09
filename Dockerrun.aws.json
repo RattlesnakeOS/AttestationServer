@@ -1,0 +1,18 @@
+{
+  "AWSEBDockerrunVersion": "1",
+  "Image": {
+    "Name": "9df8/attestationtesting:latest",
+    "Update": "true"
+  },
+  "Volumes": [
+    {
+      "HostDirectory": "/data",
+      "ContainerDirectory": "/data"
+    }
+  ],
+  "Ports": [
+    {
+      "ContainerPort": "8080"
+    }
+  ]
+}

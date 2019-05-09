@@ -72,7 +72,7 @@ import static app.attestation.server.AttestationProtocol.fingerprintsStrongBoxGr
 import static app.attestation.server.AttestationProtocol.fingerprintsStrongBoxStock;
 
 public class AttestationServer {
-    private static final File SAMPLES_DATABASE = new File("samples.db");
+    private static final File SAMPLES_DATABASE = new File("/data/samples.db");
     private static final int DEFAULT_VERIFY_INTERVAL = 4 * 60 * 60;
     private static final int MIN_VERIFY_INTERVAL = 60 * 60;
     private static final int MAX_VERIFY_INTERVAL = 7 * 24 * 70 * 60;
@@ -207,23 +207,23 @@ public class AttestationServer {
         Files.createDirectories(Paths.get("backup"));
 
         new Thread(new AlertDispatcher()).start();
-        new Thread(new Maintenance()).start();
+        //new Thread(new Maintenance()).start();
 
-        final HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 8080), 0);
-        server.createContext("/submit", new SubmitHandler());
-        server.createContext("/create_account", new CreateAccountHandler());
-        server.createContext("/change_password", new ChangePasswordHandler());
-        server.createContext("/login", new LoginHandler());
-        server.createContext("/logout", new LogoutHandler());
-        server.createContext("/logout_everywhere", new LogoutEverywhereHandler());
-        server.createContext("/rotate", new RotateHandler());
-        server.createContext("/account", new AccountHandler());
-        server.createContext("/account.png", new AccountQrHandler());
-        server.createContext("/configuration", new ConfigurationHandler());
-        server.createContext("/delete_device", new DeleteDeviceHandler());
-        server.createContext("/devices.json", new DevicesHandler());
-        server.createContext("/challenge", new ChallengeHandler());
-        server.createContext("/verify", new VerifyHandler());
+        final HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", 8080), 0);
+        server.createContext("/api/submit", new SubmitHandler());
+        server.createContext("/api/create_account", new CreateAccountHandler());
+        server.createContext("/api/change_password", new ChangePasswordHandler());
+        server.createContext("/api/login", new LoginHandler());
+        server.createContext("/api/logout", new LogoutHandler());
+        server.createContext("/api/logout_everywhere", new LogoutEverywhereHandler());
+        server.createContext("/api/rotate", new RotateHandler());
+        server.createContext("/api/account", new AccountHandler());
+        server.createContext("/api/account.png", new AccountQrHandler());
+        server.createContext("/api/configuration", new ConfigurationHandler());
+        server.createContext("/api/delete_device", new DeleteDeviceHandler());
+        server.createContext("/api/devices.json", new DevicesHandler());
+        server.createContext("/api/challenge", new ChallengeHandler());
+        server.createContext("/api/verify", new VerifyHandler());
         server.setExecutor(new ThreadPoolExecutor(10, 100, 60, TimeUnit.SECONDS, new SynchronousQueue<Runnable>()));
         server.start();
     }
@@ -315,6 +315,12 @@ public class AttestationServer {
         final SQLiteConnection conn = new SQLiteConnection(AttestationProtocol.ATTESTATION_DATABASE);
         try {
             open(conn, false);
+            SQLiteStatement statement = conn.prepare("SELECT COUNT(`userId`) FROM `Accounts`;");
+            statement.step();
+            int userCount = statement.columnInt(0);
+            if (userCount > 0) {
+                throw new GeneralSecurityException("only one user allowed");
+            }
             final SQLiteStatement insert = conn.prepare("INSERT INTO Accounts " +
                     "(username, passwordHash, passwordSalt, subscribeKey, creationTime, verifyInterval, alertDelay) " +
                     "VALUES (?, ?, ?, ?, ?, ?, ?)");
@@ -795,7 +801,7 @@ public class AttestationServer {
             }
             exchange.sendResponseHeaders(200, 0);
             try (final OutputStream output = exchange.getResponseBody()) {
-                final String contents = "attestation.app " +
+                final String contents = System.getenv("DOMAIN_NAME") + " " +
                     account.userId + " " +
                     BaseEncoding.base64().encode(account.subscribeKey) + " " +
                     account.verifyInterval;
@@ -973,7 +979,7 @@ public class AttestationServer {
                 if (pinnedSecurityLevel == AttestationProtocol.SECURITY_LEVEL_STRONGBOX) {
                     info = fingerprintsStrongBoxGrapheneOS.get(verifiedBootKey);
                     if (info != null) {
-                        device.add("os", "GrapheneOS");
+                        device.add("os", "RattlesnakeOS");
                     } else {
                         device.add("os", "Stock");
                         info = fingerprintsStrongBoxStock.get(verifiedBootKey);
@@ -984,7 +990,7 @@ public class AttestationServer {
                 } else {
                     info = fingerprintsGrapheneOS.get(verifiedBootKey);
                     if (info != null) {
-                        device.add("os", "GrapheneOS");
+                        device.add("os", "RattlesnakeOS");
                     } else {
                         device.add("os", "Stock");
                         info = fingerprintsStock.get(verifiedBootKey);
