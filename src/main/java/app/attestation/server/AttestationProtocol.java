@@ -158,7 +158,7 @@ class AttestationProtocol {
     private static final String ATTESTATION_APP_SIGNATURE_DIGEST_DEBUG =
             "17727D8B61D55A864936B1A7B4A2554A15151F32EBCF44CDAA6E6C3258231890";
     private static final String ATTESTATION_APP_SIGNATURE_DIGEST_RELEASE =
-            "990E04F0864B19F14F84E0E432F7A393F297AB105A22C1E1B10B442A4A62C42C";
+            System.getenv("ATTESTATION_APP_SIGNATURE_DIGEST_RELEASE");
     private static final int OS_VERSION_MINIMUM = 80000;
     private static final int OS_PATCH_LEVEL_MINIMUM = 201801;
     private static final int VENDOR_PATCH_LEVEL_MINIMUM = 201808;
@@ -467,12 +467,11 @@ class AttestationProtocol {
             throw new GeneralSecurityException("wrong number of attestation app signature digests");
         }
         final String signatureDigest = BaseEncoding.base16().encode(signatureDigests.get(0));
-//        // TODO: add this back
-//        if (!ATTESTATION_APP_SIGNATURE_DIGEST_RELEASE.equals(signatureDigest)) {
-//            if (!BuildConfig.DEBUG || !ATTESTATION_APP_SIGNATURE_DIGEST_DEBUG.equals(signatureDigest)) {
-//                throw new GeneralSecurityException("wrong attestation app signature digest");
-//            }
-//        }
+        if (!ATTESTATION_APP_SIGNATURE_DIGEST_RELEASE.equals(signatureDigest)) {
+            if (!BuildConfig.DEBUG || !ATTESTATION_APP_SIGNATURE_DIGEST_DEBUG.equals(signatureDigest)) {
+                throw new GeneralSecurityException("wrong attestation app signature digest");
+            }
+        }
 
         final AuthorizationList teeEnforced = attestation.getTeeEnforced();
 
