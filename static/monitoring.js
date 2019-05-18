@@ -121,9 +121,6 @@ function displayLogin(account) {
     accountContent.style.display = "block";
     configuration.verify_interval.value = account.verifyInterval / 60 / 60;
     configuration.alert_delay.value = account.alertDelay / 60 / 60;
-    if (account.email !== undefined) {
-        configuration.email.value = account.email;
-    }
     reloadQrCode();
     fetchDevices();
 }
@@ -516,7 +513,7 @@ configuration.onsubmit = event => {
         "requestToken": localStorage.getItem("requestToken"),
         "verifyInterval": verifyInterval * 60 * 60,
         "alertDelay": alertDelay * 60 * 60,
-        "email": configuration.email.value
+        "email": "unused@attestation.app"
     });
     fetch("/api/configuration", {method: "POST", body: data, credentials: "same-origin"}).then(response => {
         if (!response.ok) {
