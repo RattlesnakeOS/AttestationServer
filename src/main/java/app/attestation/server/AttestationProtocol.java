@@ -233,6 +233,8 @@ class AttestationProtocol {
                     new DeviceInfo(DEVICE_PIXEL_3_XL, 3, 3, false /* uses new API */))
             .put(System.getenv("FINGERPRINT_PIXEL3_XL"), // v2
                     new DeviceInfo(DEVICE_PIXEL_3_XL, 3, 3, false /* uses new API */))
+            .put(System.getenv("FINGERPRINT_PIXEL3A"),
+                    new DeviceInfo(DEVICE_PIXEL_3A_GENERIC, 3, 3, false /* uses new API */))
             .build();
     static final ImmutableMap<String, DeviceInfo> fingerprintsStock = ImmutableMap
             .<String, DeviceInfo>builder()
@@ -294,6 +296,8 @@ class AttestationProtocol {
                     new DeviceInfo(DEVICE_PIXEL_3, 3, 3, false /* uses new API */))
             .put(System.getenv("FINGERPRINT_PIXEL3_XL"),
                     new DeviceInfo(DEVICE_PIXEL_3_XL, 3, 3, false /* uses new API */))
+            .put(System.getenv("FINGERPRINT_PIXEL3A"),
+                    new DeviceInfo(DEVICE_PIXEL_3A_GENERIC, 3, 3, false /* uses new API */))
             .build();
     static final ImmutableMap<String, DeviceInfo> fingerprintsStrongBoxStock = ImmutableMap
             .<String, DeviceInfo>builder()
